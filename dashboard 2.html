@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depósito Base Norte — Toma de Series e Inventario</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #121110; color: #e0d8d0; display: flex; height: 100vh; overflow: hidden; }
+        
+        .sidebar { width: 320px; background-color: #1a1816; border-right: 1px solid #2c2825; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+        .profile-card { background-color: #26221f; border: 1px solid #3a3430; border-radius: 8px; padding: 12px; display: flex; align-items: center; gap: 12px; }
+        .avatar { background-color: #e65100; color: white; font-weight: bold; border-radius: 6px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .profile-info .title { color: white; font-weight: bold; font-size: 14px; }
+        .profile-info .subtitle { color: #9e948a; font-size: 11px; }
+
+        .section-title { color: #ff9800; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+        .scan-container { background-color: #1e1b18; border: 1.5px solid #ff9800; border-radius: 8px; padding: 12px; box-shadow: 0 0 10px rgba(255, 152, 0, 0.15); }
+        .scan-input { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #ff9800; background-color: #121110; color: white; font-size: 13px; font-weight: bold; outline: none; margin-top: 6px; }
+        .scan-input:focus { border-color: #ffb74d; box-shadow: 0 0 8px rgba(255, 152, 0, 0.4); }
+
+        .btn { width: 100%; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+        .btn-clear { background-color: #2a1616; color: #ff8a80; border-color: #d32f2f; }
+        .btn-clear:hover { background-color: #3d1c1c; }
+        .btn-save { background-color: #162817; color: #a5d6a7; border-color: #2e7d32; }
+        .btn-save:hover { background-color: #1d361f; }
+        .btn-danger-sm { background-color: #381818; color: #ff8a80; border: 1px solid #e53935; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
+        .btn-danger-sm:hover { background-color: #4a1f1f; }
+
+        .file-upload { background-color: #24201d; border: 1px dashed #3a3430; border-radius: 6px; padding: 10px; text-align: center; font-size: 11px; cursor: pointer; display: block; }
+        .file-upload input { display: none; }
+
+        .history-card { background-color: #24201d; border: 1px solid #3a3430; border-radius: 6px; padding: 8px 10px; font-size: 11px; margin-top: 6px; }
+        .history-card .h-title { color: white; font-weight: bold; }
+        .history-card .h-date { color: #9e948a; margin-top: 2px; }
+        .history-card .h-count { color: #ff9800; font-weight: bold; margin-top: 2px; }
+
+        .main-content { flex: 1; padding: 24px; overflow-y: auto; }
+        .header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .header h1 { font-size: 20px; color: white; margin-bottom: 4px; }
+        .header p { font-size: 13px; color: #9e948a; }
+
+        .scan-status { padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; display: none; }
+        .scan-status.success { background-color: #1b3e20; color: #81c784; border: 1px solid #2e7d32; display: inline-block; }
+        .scan-status.error { background-color: #3e1b1b; color: #e57373; border: 1px solid #c62828; display: inline-block; }
+        .scan-status.warning { background-color: #3e2f1b; color: #ffb74d; border: 1px solid #f57c00; display: inline-block; }
+
+        .table-container { background-color: #1a1816; border: 1px solid #2c2825; border-radius: 8px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th { background-color: #26221f; color: #ff9800; padding: 12px 16px; font-weight: bold; border-bottom: 1px solid #2c2825; }
+        td { padding: 10px 16px; border-bottom: 1px solid #221e1b; color: #e0d8d0; }
+        tr:nth-child(even) { background-color: #1e1a18; }
+        tr:hover { background-color: #25211e; }
+        .badge-error { background-color: #4a1919; color: #ff8a80; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .badge-ok { background-color: #1b3e20; color: #81c784; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .empty-msg { padding: 40px; text-align: center; color: #9e948a; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="profile-card">
+            <div class="avatar">BN</div>
+            <div class="profile-info">
+                <div class="title">Depósito Base Norte</div>
+                <div class="subtitle">Operador SAP / Inventario</div>
+            </div>
+        </div>
+
+        <div class="scan-container">
+            <div class="section-title" style="margin-top:0;">📷 Escanear Serie (Lector)</div>
+            <input type="text" id="serieScanner" class="scan-input" placeholder="Escanear o ingresar serie..." autofocus autocomplete="off" onkeydown="procesarEscaneo(event)">
+        </div>
+
+        <div class="section-title">Base Master SAP (Cruce Oculto)</div>
+        <label class="file-upload">
+            📁 Cargar Excel SAP (.xlsx)
+            <input type="file" id="excelInput" accept=".xlsx, .xls" onchange="cargarExcelMaster(event)">
+        </label>
+        <div id="masterStatus" style="font-size: 11px; color: #ff9800; font-weight: 500;">Master SAP: No cargado.</div>
+
+        <div class="section-title">Acciones de Borrado</div>
+        <button class="btn btn-clear" onclick="borrarTomaCompleta()">🗑️ Borrar Toma Completa</button>
+
+        <div class="section-title">Historial de Tomas</div>
+        <button class="btn btn-save" onclick="guardarTomaActual()">💾 Guardar Toma y Descargar TXT</button>
+        <div id="historialList"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h1>Toma de Stock Actual — Depósito Base Norte</h1>
+                <p id="totalCounter">Registros procesados: 0 series escaneadas en esta toma.</p>
+            </div>
+            <div id="scanFeedback" class="scan-status"></div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Número de serie</th>
+                        <th>Almacén</th>
+                        <th>Centro</th>
+                        <th>Denominación</th>
+                        <th>Estado SAP</th>
+                        <th style="width: 100px; text-align: center;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="6" class="empty-msg">No hay series capturadas en esta toma. Carga el Excel SAP de fondo y comienza a pistolear.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let baseMasterSAP = new Map();
+        let tomaActual = [];
+        let historialTomas = [];
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playBeepSuccess() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.12);
+        }
+
+        function playBeepError() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        // CARGAR BASE SAP DE FONDO CON SANITIZACIÓN AUTOMÁTICA DE "S"
+        function cargarExcelMaster(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                baseMasterSAP.clear();
+
+                jsonData.forEach((row) => {
+                    let serieOriginal = (row['Número de serie'] || row['Serie'] || '').toString().trim().toUpperCase();
+                    
+                    if (serieOriginal) {
+                        const serieLimpia = serieOriginal.startsWith('S') ? serieOriginal.substring(1) : serieOriginal;
+
+                        const datosItem = {
+                            almacen: (row['Almacén'] || row['Almacen'] || row['Alm.'] || 'DP01').toString(),
+                            centro: (row['Centro'] || 'RX03').toString(),
+                            denominacion: (row['Texto breve de material'] || row['Denominación'] || row['Denominacion'] || 'MATERIAL SAP').toString()
+                        };
+
+                        baseMasterSAP.set(serieLimpia, datosItem);
+                        baseMasterSAP.set(serieOriginal, datosItem);
+                    }
+                });
+
+                document.getElementById('masterStatus').innerText = `✅ Master SAP Listo: ${jsonData.length.toLocaleString()} series cargadas (Prefijo 'S' removido).`;
+                playBeepSuccess();
+                showFeedback(`Master SAP cargado correctamente`, 'success');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ESCANEAR SERIE Y CRUZAR EN TIEMPO REAL
+        function procesarEscaneo(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const input = document.getElementById('serieScanner');
+                let serieIngresada = input.value.trim().toUpperCase();
+
+                if (!serieIngresada) return;
+
+                // 1. Validar Duplicado en la toma actual
+                const existeEnToma = tomaActual.some(item => item.serie === serieIngresada);
+                if (existeEnToma) {
+                    playBeepError();
+                    showFeedback(`⚠️ SERIE DUPLICADA: ${serieIngresada}`, 'error');
+                    input.value = '';
+                    return;
+                }
+
+                // 2. Cruzar con la Base Master SAP
+                let itemSAP = baseMasterSAP.get(serieIngresada);
+                if (!itemSAP && serieIngresada.startsWith('S')) {
+                    itemSAP = baseMasterSAP.get(serieIngresada.substring(1));
+                }
+
+                let registroToma = {
+                    serie: serieIngresada,
+                    almacen: itemSAP ? itemSAP.almacen : 'N/A',
+                    centro: itemSAP ? itemSAP.centro : 'N/A',
+                    denominacion: itemSAP ? itemSAP.denominacion : 'NO FIGURA EN EXCEL SAP',
+                    encontradoEnSAP: !!itemSAP
+                };
+
+                tomaActual.unshift(registroToma);
+
+                if (registroToma.encontradoEnSAP) {
+                    playBeepSuccess();
+                    showFeedback(`✅ Serie capturada: ${serieIngresada}`, 'success');
+                } else {
+                    playBeepError();
+                    showFeedback(`⚠️ Serie No encontrada en SAP: ${serieIngresada}`, 'warning');
+                }
+
+                input.value = '';
+                renderTabla();
+            }
+        }
+
+        function showFeedback(msg, type) {
+            const feedback = document.getElementById('scanFeedback');
+            feedback.innerText = msg;
+            feedback.className = `scan-status ${type}`;
+            setTimeout(() => { feedback.className = 'scan-status'; }, 2500);
+        }
+
+        function renderTabla() {
+            const tbody = document.getElementById('tableBody');
+            const counter = document.getElementById('totalCounter');
+            
+            counter.innerText = `Registros procesados: ${tomaActual.length.toLocaleString()} series escaneadas en esta toma.`;
+
+            if (tomaActual.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">No hay series capturadas en esta toma. Carga el Excel SAP de fondo y comienza a pistolear.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = tomaActual.map((item, index) => `
+                <tr>
+                    <td style="font-weight: 500;">${item.serie}</td>
+                    <td>${item.almacen}</td>
+                    <td>${item.centro}</td>
+                    <td style="color: #a0968c;">${item.denominacion}</td>
+                    <td>
+                        ${item.encontradoEnSAP 
+                            ? '<span class="badge-ok">VERIFICADO SAP</span>' 
+                            : '<span class="badge-error">NO EN SAP / MAL TOMADA</span>'}
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="btn-danger-sm" onclick="borrarUnidad(${index})">Borrar</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function borrarUnidad(index) {
+            tomaActual.splice(index, 1);
+            playBeepError();
+            renderTabla();
+        }
+
+        function borrarTomaCompleta() {
+            if (confirm("¿Estás seguro de que deseas borrar toda la toma actual?")) {
+                tomaActual = [];
+                playBeepError();
+                renderTabla();
+            }
+        }
+
+        // GUARDAR Y DESCARGAR ARCHIVO TXT
+        function guardarTomaActual() {
+            if (tomaActual.length === 0) {
+                alert("No hay registros en la toma actual para guardar.");
+                return;
+            }
+
+            const ahora = new Date();
+            const fechaHoraStr = `${ahora.getFullYear()}-${(ahora.getMonth()+1).toString().padStart(2, '0')}-${ahora.getDate().toString().padStart(2, '0')}_${ahora.getHours().toString().padStart(2, '0')}-${ahora.getMinutes().toString().padStart(2, '0')}`;
+            const fechaLegible = `${ahora.getDate().toString().padStart(2, '0')}/${(ahora.getMonth()+1).toString().padStart(2, '0')}/${ahora.getFullYear()} - ${ahora.getHours().toString().padStart(2, '0')}:${ahora.getMinutes().toString().padStart(2, '0')} hs`;
+
+            // Generar contenido del archivo TXT
+            let txtContenido = `TOMA DE INVENTARIO - DEPÓSITO BASE NORTE\n`;
+            txtContenido += `Fecha de guardado: ${fechaLegible}\n`;
+            txtContenido += `Total de series: ${tomaActual.length}\n`;
+            txtContenido += `--------------------------------------------------------------------------------\n`;
+            txtContenido += `SERIE\tALMACEN\tCENTRO\tESTADO_SAP\tDENOMINACION\n`;
+            txtContenido += `--------------------------------------------------------------------------------\n`;
+
+            tomaActual.forEach(item => {
+                const estado = item.encontradoEnSAP ? 'VERIFICADO_SAP' : 'NO_EN_SAP';
+                txtContenido += `${item.serie}\t${item.almacen}\t${item.centro}\t${estado}\t${item.denominacion}\n`;
+            });
+
+            // Disparar descarga directa del archivo TXT
+            const blob = new Blob([txtContenido], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Toma_Deposito_Base_Norte_${fechaHoraStr}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Registrar en el historial de la interfaz
+            historialTomas.unshift({
+                deposito: 'Depósito Base Norte',
+                fecha: fechaLegible,
+                total: tomaActual.length
+            });
+
+            playBeepSuccess();
+            showFeedback(`💾 Toma guardada y TXT descargado con éxito`, 'success');
+            renderHistorial();
+        }
+
+        function renderHistorial() {
+            const list = document.getElementById('historialList');
+            list.innerHTML = historialTomas.map(toma => `
+                <div class="history-card">
+                    <div class="h-title">${toma.deposito}</div>
+                    <div class="h-date">📅 ${toma.fecha}</div>
+                    <div class="h-count">📦 ${toma.total.toLocaleString()} series descargadas</div>
+                </div>
+            `).join('');
+        }
+
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                document.getElementById('serieScanner').focus();
+            }
+        });
+    </script>
+</body>
+</html>
